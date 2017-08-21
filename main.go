@@ -26,12 +26,18 @@ func (i *StrMapFlag) Set(value string) error {
 }
 
 var (
-	checks = StrMapFlag{
+	masterChecks = map[string]string{
 		"apiserver":         "http://127.0.0.1:80/healthz",
 		"scheduler":         "http://127.0.0.1:10251/healthz",
 		"controllermanager": "http://127.0.0.1:10252/healthz",
+		"kubelet":           "http://127.0.0.1:10248/healthz",
 	}
+	workerChecks = map[string]string{
+		"kubelet": "http://127.0.0.1:10248/healthz",
+	}
+	checks = StrMapFlag{}
 	listen string
+	role   string
 )
 
 func run(url string) error {
@@ -73,8 +79,20 @@ func healthz(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.StringVar(&listen, "listen", "0.0.0.0:6199", "Address and port to listen on")
+	flag.StringVar(&role, "role", "", "Node role sets up default checks [master, worker]")
 	flag.Var(&checks, "checks", "")
 	flag.Parse()
+
+	if role == "master" {
+		for k, v := range masterChecks {
+			checks[k] = v
+		}
+	}
+	if role == "worker" {
+		for k, v := range workerChecks {
+			checks[k] = v
+		}
+	}
 
 	http.HandleFunc("/healthz", healthz)
 	err := http.ListenAndServe(listen, nil)
